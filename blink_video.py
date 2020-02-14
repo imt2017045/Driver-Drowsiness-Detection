@@ -23,11 +23,17 @@ import cv2
 import tensorflow as tf
 
 ####################################Global Variables###########################
+font                   = cv2.FONT_HERSHEY_SIMPLEX
+bottomLeftCornerOfText = (10,50)
+fontScale              = 1
+fontColor              = (255,0,0)
+lineType               = 2
 
 user_calib = [[0.0,0.0],[0.0,0.0],[0.0,0.0],[0.0,0.0]]
 u_features=[]
 input_net=None
 keep_p=None
+voting = [0,0,0]
 final = []
 training =None
 features =[]
@@ -121,6 +127,12 @@ def solve(freq,blink,calibration):
         features.append(normalize_blinks(1,freq,user_calib[0][0],user_calib[0][1],blinks[0],user_calib[1][0],user_calib[1][1],blinks[1],user_calib[2][0],user_calib[2][1],blinks[2],user_calib[3][0],user_calib[3][1]))
         ans = predict_image(features)
         final.append(ans)
+        if(10 - ans < 3.3):
+            voting[0]+=1
+        elif(10 -ans > 6.6):
+            voting[2] +=1
+        else:
+            voting[1]+=1
         return ans
     elif(len(features)==30):
         flag_for_window = True
@@ -129,7 +141,7 @@ def solve(freq,blink,calibration):
     else:
         blinks = [blink.amplitude,blink.duration ,blink.velocity]
         features.append(normalize_blinks(1,freq,user_calib[0][0],user_calib[0][1],blinks[0],user_calib[1][0],user_calib[1][1],blinks[1],user_calib[2][0],user_calib[2][1],blinks[2],user_calib[3][0],user_calib[3][1]))
-        # temp_features = 
+        # temp_features =
         print(features)
         return ;
 
@@ -362,14 +374,13 @@ def blink_detector(output_textfile,input_video):
     stream = cv2.VideoCapture(path)
     start = datetime.datetime.now()
     number_of_frames=0
-    print("Calibrating user face features ----------------------------------------\n")
+    print("Calibrating user face features ---------------------------------------\n")
     flag_for_calibration = 0 #calibarate for around 2000 frames
     CALIB_LENGTH  = 500
     cal_flag = True
     global u_features
     while True:
-        if(len(final)>5):
-            print(">>>>>>>>>>>>>>>>>>>>>{}<<<<<<<<<<<<<<<<<<<<<<<<<<".format((sum(final)/len(final)+0.0)))
+        # print(">>>>>>>>>>>>>>>>>>>>>{}<<<<<<<<<<<<<<<<<<<<<<<<<<".format(voting))
         if(flag_for_calibration == CALIB_LENGTH):
             cal_flag = False
             calibrate(u_features)
@@ -438,12 +449,15 @@ def blink_detector(output_textfile,input_video):
                                 u_features.append([BLINK_FRAME_FREQ*100,detected_blink.amplitude,detected_blink.duration,detected_blink.velocity   ])
                             else:
                                 ans = solve(BLINK_FRAME_FREQ*100,detected_blink,user_calib)
-                                # cv2.putText(frame,"Score : {}".format(ans),(100,10),cv2.FONT_HERSHEY_SIMPLEX,(255,0,255),cv2.LINE_AA)
-
                     Last_Blink.end = -10 # re initialization
                 line.set_ydata(EAR_series)
                 plot_frame.draw()
                 frameMinus7=Q.get()
+                if(flag_for_calibration==False):
+                    cv2.putText(frameMinus7,'A :{} LoV :{} S :{} '.format(voting[0],voting[1],voting[2]), bottomLeftCornerOfText, font, fontScale,fontColor,lineType)
+                else:
+
+                    cv2.putText(frameMinus7,'Calibrating...',bottomLeftCornerOfText,font,fontScale,fontColor,lineType)
                 cv2.imshow("Frame", frameMinus7)
             elif Q.full():         #just to make way for the new input of the Q when the Q is full
                 junk =  Q.get()
@@ -498,6 +512,8 @@ def blink_detector(output_textfile,input_video):
                 line.set_ydata(EAR_series)
                 plot_frame.draw()
                 frameMinus7=Q.get()
+
+
                 cv2.imshow("Frame", frameMinus7)
             elif Q.full():
                 junk = Q.get()
@@ -512,7 +528,7 @@ def blink_detector(output_textfile,input_video):
 
 output_file = 'alert.txt'  # The text file to write to (for blinks)#
 path = '../Fold3_part2/31/10.mp4' # the path to the input video
-
+# path = 1
 blink_detector(output_file,path)
 f = open("10input.txt","w")
 f.write(str(final))
